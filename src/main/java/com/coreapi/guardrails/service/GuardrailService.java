@@ -12,13 +12,17 @@ import java.util.concurrent.TimeUnit;
 @RequiredArgsConstructor
 @Slf4j
 public class GuardrailService {
+    private static final int MAX_BOT_REPLIES_PER_POST = 100;
+    private static final int MAX_THREAD_DEPTH = 20;
+    private static final long BOT_COOLDOWN_MINUTES = 10L;
+
     private final RedisTemplate<String, Object> redisTemplate;
     private final RedisScript<Long> horizontalCapScript;
 
-    // Hardcoded limits for simpler look
     public boolean checkHorizontalCap(Long postId) {
-        String key = "post:" + postId + ":bot_count";
-        Long res = redisTemplate.execute(horizontalCapScript, Collections.singletonList(key), 100);
+        Long res = redisTemplate.execute(horizontalCapScript,
+                Collections.singletonList(horizontalCapKey(postId)),
+                MAX_BOT_REPLIES_PER_POST);
         if (res == null || res == -1) {
             log.warn("Horizontal cap hit for post {}", postId);
             return false;
@@ -27,7 +31,7 @@ public class GuardrailService {
     }
 
     public boolean checkVerticalCap(int depth) {
-        if (depth > 20) {
+        if (depth > MAX_THREAD_DEPTH) {
             log.warn("Vertical cap hit: {}", depth);
             return false;
         }
@@ -35,12 +39,28 @@ public class GuardrailService {
     }
 
     public boolean checkBotCooldown(Long botId, Long userId) {
-        String key = "cooldown:bot_" + botId + ":user_" + userId;
-        Boolean set = redisTemplate.opsForValue().setIfAbsent(key, "1", 10, TimeUnit.MINUTES);
+        Boolean set = redisTemplate.opsForValue().setIfAbsent(cooldownKey(botId, userId), "1",
+                BOT_COOLDOWN_MINUTES, TimeUnit.MINUTES);
         if (Boolean.FALSE.equals(set)) {
-            log.warn("Cooldown active for bot {}", botId);
+            log.warn("Cooldown active for bot {} and user {}", botId, userId);
             return false;
         }
         return true;
+    }
+
+    public void releaseHorizontalCap(Long postId) {
+        redisTemplate.opsForValue().decrement(horizontalCapKey(postId));
+    }
+
+    public void releaseBotCooldown(Long botId, Long userId) {
+        redisTemplate.delete(cooldownKey(botId, userId));
+    }
+
+    private String horizontalCapKey(Long postId) {
+        return "post:" + postId + ":bot_count";
+    }
+
+    private String cooldownKey(Long botId, Long userId) {
+        return "cooldown:bot_" + botId + ":user_" + userId;
     }
 }

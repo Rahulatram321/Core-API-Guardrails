@@ -21,6 +21,9 @@ public class Comment {
     @Column(nullable = false)
     private Long postId;
 
+    @Column
+    private Long parentCommentId;
+
     @Column(nullable = false)
     private Long authorId;
 
@@ -33,6 +36,14 @@ public class Comment {
 
     @Column(nullable = false)
     private int depthLevel;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "post_id", insertable = false, updatable = false)
+    private Post post;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "parent_comment_id", insertable = false, updatable = false)
+    private Comment parentComment;
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)

@@ -5,6 +5,8 @@ import lombok.*;
 import org.hibernate.annotations.CreationTimestamp;
 
 import java.time.LocalDateTime;
+import java.util.ArrayList;
+import java.util.List;
 
 @Entity
 @Table(name = "posts")
@@ -27,6 +29,10 @@ public class Post {
 
     @Column(columnDefinition = "TEXT", nullable = false)
     private String content;
+
+    @OneToMany(mappedBy = "post")
+    @Builder.Default
+    private List<Comment> comments = new ArrayList<>();
 
     @CreationTimestamp
     @Column(nullable = false, updatable = false)
